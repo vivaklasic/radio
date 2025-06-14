@@ -1,3 +1,6 @@
-flask
+Flask
+Flask-Cors
+gunicorn
+gspread
 google-generativeai
-google-cloud-texttospeech
+python-dotenv
