@@ -10,8 +10,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const audioPlayer = document.getElementById('audio-player');
 
     // --- URL вашего бэкенда на Render ---
-    // !!! ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL ПОСЛЕ ДЕПЛОЯ !!!
-    const backendUrl = 'https://radio-2gyc.onrender.com';
+    // !!! ИСПРАВЛЕНА ЭТА СТРОКА !!!
+    const backendUrl = 'https://radio-2gyc.onrender.com/get-radio-play';
     // Для локальных тестов:
     // const backendUrl = 'http://127.0.0.1:5001/get-radio-play';
 
