@@ -1,5 +1,7 @@
+// Код app.js остается точно таким же, как в моем ответе про плейлист,
+// но я продублирую его здесь с одним важным исправлением в обработчике кнопки.
+
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Элементы страницы (без изменений) ---
     const userRequestInput = document.getElementById('user-request');
     const playButton = document.getElementById('play-button');
     const buttonText = document.querySelector('.button-text');
@@ -9,16 +11,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const trackInfoElement = document.getElementById('track-info');
     const audioPlayer = document.getElementById('audio-player');
 
-    // --- URL бэкенда (без изменений) ---
     const backendUrl = 'https://radio-2gyc.onrender.com/get-radio-play';
 
-    // --- НОВЫЕ ПЕРЕМЕННЫЕ ДЛЯ УПРАВЛЕНИЯ ПЛЕЙЛИСТОМ ---
     let currentPlaylist = [];
     let currentTrackIndex = 0;
 
-    // --- Функция для общения с бэкендом (без изменений) ---
     async function fetchRadioPlay(userRequest) {
-        // ... эта функция остается точно такой же
         try {
             const response = await fetch(backendUrl, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -35,30 +33,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Функция для управления кнопкой (без изменений) ---
     function setButtonLoading(isLoading) {
-        // ... эта функция остается точно такой же
         playButton.disabled = isLoading;
         buttonText.style.display = isLoading ? 'none' : 'inline';
         spinner.style.display = isLoading ? 'block' : 'none';
     }
 
-    // --- НОВАЯ ФУНКЦИЯ ДЛЯ ЗАПУСКА ТРЕКА ИЗ ПЛЕЙЛИСТА ---
     function playTrack(trackIndex) {
-        if (trackIndex < currentPlaylist.length) {
+        if (currentPlaylist && trackIndex < currentPlaylist.length) { // Добавлена проверка на существование плейлиста
             const track = currentPlaylist[trackIndex];
             trackInfoElement.textContent = `${track.artist} - ${track.title}`;
             nowPlayingContainer.style.display = 'block';
             audioPlayer.src = track.musicUrl;
             audioPlayer.play();
         } else {
-            // Плейлист закончился
             speechTextElement.textContent = "Музыкальный блок завершен. Что поставим дальше?";
             nowPlayingContainer.style.display = 'none';
         }
     }
     
-    // --- ОБНОВЛЕННЫЙ ОБРАБОТЧИК НАЖАТИЯ НА КНОПКУ ---
     playButton.addEventListener('click', async () => {
         const userRequest = userRequestInput.value.trim();
         if (!userRequest) {
@@ -72,33 +65,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const data = await fetchRadioPlay(userRequest);
 
+        setButtonlong>
         setButtonLoading(false);
 
         if (data.error) {
             speechTextElement.textContent = `Произошла ошибка: ${data.error}`;
         } else {
-            // УСПЕШНЫЙ ОТВЕТ С ПЛЕЙЛИСТОМ
-            speechTextElement.textContent = data.speechText; // Показываем общую подводку
+            speechTextElement.textContent = data.speechText;
             
-            currentPlaylist = data.playlist; // Сохраняем полученный плейлист
-            currentTrackIndex = 0; // Сбрасываем счетчик на начало
-
-            if (currentPlaylist && currentPlaylist.length > 0) {
-                playTrack(currentTrackIndex); // Запускаем первый трек
+            // --- ГЛАВНОЕ ИЗМЕНЕНИЕ ЗДЕСЬ ---
+            // Проверяем, что плейлист существует и в нем есть хотя бы одна песня
+            if (data.playlist && data.playlist.length > 0) {
+                currentPlaylist = data.playlist;
+                currentTrackIndex = 0;
+                playTrack(currentTrackIndex);
             } else {
-                speechTextElement.textContent = "Не удалось найти подходящие треки. Попробуйте другой запрос.";
+                // Если плейлист пустой, просто выводим сообщение и ничего не проигрываем
+                console.log("Получен пустой плейлист. Музыка не будет проигрываться.");
+                nowPlayingContainer.style.display = 'none';
+                // Текст от AI уже установлен, он скажет, что ничего не нашел
             }
         }
     });
 
-    // --- НОВЫЙ ОБРАБОТЧИК: АВТОМАТИЧЕСКОЕ ПЕРЕКЛЮЧЕНИЕ НА СЛЕДУЮЩИЙ ТРЕК ---
     audioPlayer.addEventListener('ended', () => {
-        currentTrackIndex++; // Переходим к следующему треку
-        playTrack(currentTrackIndex); // Запускаем его
+        currentTrackIndex++;
+        playTrack(currentTrackIndex);
     });
 
-
-    // --- Обработчик Enter (без изменений) ---
     userRequestInput.addEventListener('keyup', (event) => {
         if (event.key === 'Enter') {
             event.preventDefault();
