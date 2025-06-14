@@ -30,7 +30,7 @@ try:
         print("Успешное подключение к Google Sheets через локальный файл.")
 
     # Общий код для обоих случаев
-    sh = gc.open_by_key('YOUR_GOOGLE_SHEET_KEY') # !!! НЕ ЗАБУДЬТЕ ВСТАВИТЬ ВАШ КЛЮЧ ТАБЛИЦЫ !!!
+    sh = gc.open_by_key('1NDTPGtwDlqo0djTQlsegZtI8-uTl1ojTtbT0PmtR5YU') # !!! НЕ ЗАБУДЬТЕ ВСТАВИТЬ ВАШ КЛЮЧ ТАБЛИЦЫ !!!
     tracks_worksheet = sh.worksheet('tracks') # Укажите имя листа
     
 except Exception as e:
