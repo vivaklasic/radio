@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- Элементы страницы ---
+    // --- Элементы страницы (согласно вашему HTML) ---
     const userRequestInput = document.getElementById('user-request');
     const playButton = document.getElementById('play-button');
     const buttonText = document.querySelector('.button-text');
@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentTrackIndex = 0;
     let isAiMode = false;
 
-    // --- Функция: Загружает всю библиотеку при старте ---
+    // --- Функции fetchFullLibrary и fetchAiPlaylist (без изменений) ---
     async function fetchFullLibrary() {
         try {
             const response = await fetch(libraryBackendUrl);
@@ -28,13 +28,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 fullLibrary = data.playlist;
                 console.log(`Загружена полная библиотека из ${fullLibrary.length} треков.`);
             }
-        } catch (error) {
-            console.error("Не удалось загрузить полную библиотеку:", error);
-        }
+        } catch (error) { console.error("Не удалось загрузить полную библиотеку:", error); }
     }
     fetchFullLibrary();
 
-    // --- Функция: Отправляет запрос к AI ---
     async function fetchAiPlaylist(userRequest) {
         try {
             const response = await fetch(aiBackendUrl, {
@@ -53,57 +50,56 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Функция: Управляет состоянием кнопки ---
+    // --- Функция setButtonLoading (без изменений) ---
     function setButtonLoading(isLoading) {
         playButton.disabled = isLoading;
         buttonText.style.display = isLoading ? 'none' : 'inline';
         spinner.style.display = isLoading ? 'block' : 'none';
     }
 
-    // --- Главная функция проигрывания (МОЗГ РАДИО) ---
+    // --- Главная функция проигрывания (правильная версия) ---
     function playNextTrack() {
         let trackToPlay = null;
 
-        // ШАГ 1: ПРОВЕРЯЕМ, АКТИВЕН ЛИ РЕЖИМ AI И ЕСТЬ ЛИ В НЕМ ЕЩЕ ТРЕКИ
         if (isAiMode && currentTrackIndex < currentAiPlaylist.length) {
-            // Да, мы в режиме AI. Берем следующий трек из него.
+            // РЕЖИМ AI: берем трек из плейлиста диджея
             trackToPlay = currentAiPlaylist[currentTrackIndex];
-            
-            // Показываем "Далее в эфире..." ТОЛЬКО для второго и последующих треков.
-            // Для первого трека (index=0) подводку уже показал диджей.
-            if (currentTrackIndex > 0) {
-                speechTextElement.textContent = `Далее: ${trackToPlay.title}`;
-            }
         } else {
-            // ШАГ 2: РЕЖИМ AI ЗАКОНЧИЛСЯ ИЛИ НЕ НАЧИНАЛСЯ. ПЕРЕХОДИМ К СЛУЧАЙНОМУ РАДИО.
-            isAiMode = false; // Убеждаемся, что режим AI выключен.
+            // РЕЖИМ СЛУЧАЙНОГО РАДИО
+            if (isAiMode) { // Если мы ТОЛЬКО ЧТО вышли из режима AI
+                speechTextElement.textContent = "Подборка от AI завершена. Перехожу в режим радио.";
+            }
+            isAiMode = false;
+            
             if (fullLibrary.length > 0) {
                 const randomIndex = Math.floor(Math.random() * fullLibrary.length);
                 trackToPlay = fullLibrary[randomIndex];
-                speechTextElement.textContent = "В эфире случайный трек...";
             }
         }
 
-        // ШАГ 3: ВОСПРОИЗВОДИМ ВЫБРАННЫЙ ТРЕК (ИЛИ СООБЩАЕМ ОБ ОШИБКЕ)
         if (trackToPlay) {
+            // ЗАПОЛНЯЕМ ПОЛЕ С НАЗВАНИЕМ ТРЕКА
             trackInfoElement.textContent = `${trackToPlay.artist} - ${trackToPlay.title}`;
+            // ПОКАЗЫВАЕМ ВЕСЬ БЛОК
             nowPlayingContainer.style.display = 'block';
             audioPlayer.src = trackToPlay.musicUrl;
             audioPlayer.play();
         } else {
-            speechTextElement.textContent = "Музыка закончилась или библиотека пуста. Сделайте новый запрос.";
+            // Музыки нет, скрываем блок
+            speechTextElement.textContent = "Музыка закончилась или библиотека пуста.";
             nowPlayingContainer.style.display = 'none';
         }
     }
     
-    // --- Обработчик нажатия кнопки (ЗАПУСКАЕТ РЕЖИМ AI) ---
+    // --- Обработчик нажатия кнопки (правильная версия) ---
     playButton.addEventListener('click', async () => {
         const userRequest = userRequestInput.value.trim();
         if (!userRequest) return;
 
         setButtonLoading(true);
+        // Готовим UI к ответу от AI
         speechTextElement.textContent = "AI-диджей составляет плейлист...";
-        nowPlayingContainer.style.display = 'none';
+        nowPlayingContainer.style.display = 'none'; // Скрываем старый трек
         audioPlayer.pause(); 
 
         const data = await fetchAiPlaylist(userRequest);
@@ -111,38 +107,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (data.error) {
             speechTextElement.textContent = `Произошла ошибка: ${data.error}`;
-            isAiMode = false; // Сбрасываем режим AI в случае ошибки
             return;
         }
-
-        // 1. Показываем подводку диджея, которую он прислал.
+        
+        // ПОМЕЩАЕМ РЕЧЬ ДИДЖЕЯ В ЕГО ПОЛЕ
         speechTextElement.textContent = data.speechText || "К сожалению, не удалось найти подходящие треки.";
 
         if (data.playlist && data.playlist.length > 0) {
-            // 2. Успех! Готовимся к запуску AI-плейлиста.
+            // Успех! Готовимся к запуску AI-плейлиста
             currentAiPlaylist = data.playlist;
             currentTrackIndex = 0;
-            isAiMode = true; // Включаем режим AI
-            
-            // 3. Запускаем первый трек. Дальше все пойдет по цепочке.
-            playNextTrack();
+            isAiMode = true;
+            playNextTrack(); // Запускаем воспроизведение
         } else {
-            // AI ничего не нашел, остаемся в режиме случайного радио.
             isAiMode = false;
         }
     });
 
-    // --- Обработчик окончания трека (ПЕРЕКЛЮЧАТЕЛЬ) ---
+    // --- Обработчик окончания трека (без изменений) ---
     audioPlayer.addEventListener('ended', () => {
-        // Если мы были в режиме AI, увеличиваем счетчик, чтобы перейти к следующему треку.
         if (isAiMode) {
             currentTrackIndex++;
         }
-        // Просто вызываем "мозг" радио. Он сам решит, что делать дальше.
         playNextTrack();
     });
 
-    // --- Обработчик Enter ---
+    // --- Обработчик Enter (без изменений) ---
     userRequestInput.addEventListener('keyup', (event) => {
         if (event.key === 'Enter') {
             event.preventDefault();
