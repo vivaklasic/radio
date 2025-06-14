@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Не удалось загрузить полную библиотеку:", error);
         }
     }
-    fetchFullLibrary(); // Запускаем загрузку сразу
+    fetchFullLibrary();
 
     // --- Функция: Отправляет запрос к AI ---
     async function fetchAiPlaylist(userRequest) {
@@ -60,17 +60,22 @@ document.addEventListener('DOMContentLoaded', () => {
         spinner.style.display = isLoading ? 'block' : 'none';
     }
 
-    // --- Главная функция проигрывания ---
+    // --- Главная функция проигрывания (С ИСПРАВЛЕНИЕМ) ---
     function playNextTrack() {
         let trackToPlay = null;
 
         if (isAiMode && currentTrackIndex < currentAiPlaylist.length) {
-            // РЕЖИМ AI: Играем следующий трек из сгенерированного плейлиста
             trackToPlay = currentAiPlaylist[currentTrackIndex];
-            speechTextElement.textContent = `В эфире: ${trackToPlay.title}`; // Обновляем статус
+            
+            // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ---
+            // Мы меняем текст ТОЛЬКО для второго и последующих треков.
+            // Для первого трека (index = 0) текст уже установлен (это подводка диджея).
+            if (currentTrackIndex > 0) {
+                speechTextElement.textContent = `Далее в эфире: ${trackToPlay.title}`;
+            }
+
         } else {
-            // РЕЖИМ ФОНОВОГО РАДИО
-            isAiMode = false; // Выключаем режим AI
+            isAiMode = false;
             if (fullLibrary.length > 0) {
                 const randomIndex = Math.floor(Math.random() * fullLibrary.length);
                 trackToPlay = fullLibrary[randomIndex];
@@ -89,8 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- Обработчик нажатия кнопки ---
-        // --- ИСПРАВЛЕННЫЙ Обработчик нажатия кнопки ---
+    // --- Обработчик нажатия кнопки (УПРОЩЕННЫЙ И ИСПРАВЛЕННЫЙ) ---
     playButton.addEventListener('click', async () => {
         const userRequest = userRequestInput.value.trim();
         if (!userRequest) return;
@@ -98,33 +102,28 @@ document.addEventListener('DOMContentLoaded', () => {
         setButtonLoading(true);
         speechTextElement.textContent = "AI-диджей составляет плейлист...";
         nowPlayingContainer.style.display = 'none';
+        audioPlayer.pause(); // Останавливаем текущую музыку, если она играет
 
         const data = await fetchAiPlaylist(userRequest);
         setButtonLoading(false);
 
         if (data.error) {
             speechTextElement.textContent = `Произошла ошибка: ${data.error}`;
-            return; // Выходим из функции
+            return;
         }
 
-        // Показываем ответ диджея
+        // 1. Показываем подводку диджея
         speechTextElement.textContent = data.speechText || "К сожалению, не удалось найти подходящие треки.";
 
         if (data.playlist && data.playlist.length > 0) {
-            // Если есть плейлист, обновляем его и готовимся к старту
+            // 2. Готовим плейлист к проигрыванию
             currentAiPlaylist = data.playlist;
             currentTrackIndex = 0;
             isAiMode = true;
-
-            // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: ЗАПУСКАЕМ МУЗЫКУ С ЗАДЕРЖКОЙ ---
-            // Даем пользователю 5 секунд, чтобы прочитать сообщение диджея.
-            // Вы можете изменить это значение (5000 миллисекунд).
-            setTimeout(() => {
-                playNextTrack();
-            }, 5000); 
-
+            
+            // 3. СРАЗУ запускаем первый трек. Наша новая логика в playNextTrack не сотрет подводку.
+            playNextTrack();
         } else {
-            // Если плейлист пуст, просто показываем сообщение и ничего не делаем
             isAiMode = false;
         }
     });
@@ -134,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isAiMode) {
             currentTrackIndex++;
         }
-        playNextTrack(); // Запускаем следующий трек (логика решит, какой именно)
+        playNextTrack();
     });
 
     // --- Обработчик Enter ---
