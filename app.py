@@ -8,11 +8,11 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 
 load_dotenv()
-
 app = Flask(__name__)
 CORS(app)
 
-# --- НАСТРОЙКА (без изменений) ---
+# --- Настройка (без изменений) ---
+# ... (весь ваш блок настройки остается без изменений) ...
 tracks_worksheet = None
 model = None
 
@@ -41,15 +41,14 @@ else:
     print("КРИТИЧЕСКАЯ ОШИБКА: API ключ для Gemini не найден.")
     model = None
 
-# --- ЛОГИКА (без изменений) ---
+# --- Логика (без изменений) ---
+# ... (функции get_all_tracks и format_tracks_for_ai остаются без изменений) ...
 def get_all_tracks():
-    # ... (эта функция остается без изменений)
     if not tracks_worksheet: return []
     try: return tracks_worksheet.get_all_records()
     except Exception as e: return []
 
 def format_tracks_for_ai(tracks):
-    # ... (эта функция остается без изменений)
     library_text = ""
     for track in tracks:
         track_info = (f"ID: {track.get('id', 'N/A')}, Title: {track.get('title', 'N/A')}, "
@@ -58,7 +57,7 @@ def format_tracks_for_ai(tracks):
         library_text += track_info
     return library_text
 
-# --- API ЭНДПОИНТ (ЗДЕСЬ ГЛАВНЫЕ ИЗМЕНЕНИЯ) ---
+# --- API Эндпоинт (с новыми проверками) ---
 @app.route('/')
 def index():
     return "Flask-сервер для AI Радио работает!"
@@ -76,53 +75,53 @@ def get_radio_play():
 
     all_tracks = get_all_tracks()
     if not all_tracks:
-        return jsonify({"error": "Не удалось загрузить треки из базы."}), 500
+        return jsonify({"error": "Библиотека музыки пуста."}), 500
         
     library_description = format_tracks_for_ai(all_tracks)
 
-    # 1. ОБНОВЛЕННЫЙ ПРОМПТ: Просим составить плейлист
     prompt = f"""
-        Ты AI-диджей. Твоя задача - составить плейлист примерно из 10 песен, который соответствует запросу слушателя. 
-        После этого напиши одну общую, короткую и дружелюбную подводку для всего этого музыкального блока.
+        Ты AI-диджей. Твоя задача - составить плейлист из подходящих песен, который соответствует запросу слушателя.
+        Подбери столько треков, сколько сможешь найти подходящих, но не более 5. 
+        ВАЖНО: Если подходящих треков нет или их меньше двух, верни в поле "playlist" пустой массив [].
+        После этого напиши одну общую, короткую и дружелюбную подводку для всего этого музыкального блока. Если плейлист пуст, твоя подводка должна говорить, что ты ничего не нашел.
 
         Запрос от слушателя по имени {user_name}: "{user_request}"
 
         Музыкальная библиотека:
         {library_description}
 
-        Ответь в формате JSON, и только JSON. Не добавляй ```json или другие символы.
-        Структура должна быть такой:
-        {{
-          "playlist": [ID_трека_1, ID_трека_2, ...],
-          "speechText": "Текст твоей общей подводки для всего плейлиста."
-        }}
+        Ответь в формате JSON, и только JSON.
+        Структура: {{ "playlist": [ID_трека_1, ID_трека_2, ...], "speechText": "Текст твоей подводки" }}
     """
 
     try:
         response = model.generate_content(prompt)
         ai_data = json.loads(response.text)
         
-        # 2. ПОЛУЧАЕМ СПИСОК ID, А НЕ ОДИН ID
-        playlist_ids = ai_data['playlist']
-        speech_text = ai_data['speechText']
+        # Улучшенная проверка ответа от AI
+        playlist_ids = ai_data.get('playlist', [])
+        speech_text = ai_data.get('speechText', "Что-то пошло не так...")
         
+        # Проверяем, что плейлист - это список, и он не пустой
+        if not isinstance(playlist_ids, list) or not playlist_ids:
+            print("AI вернул пустой или некорректный плейлист.")
+            # Отправляем на фронт текст от AI, но с пустым плейлистом
+            return jsonify({"speechText": speech_text, "playlist": []})
+
         playlist_tracks = []
-        # 3. СОБИРАЕМ ДАННЫЕ ДЛЯ КАЖДОГО ТРЕКА В ПЛЕЙЛИСТЕ
         for track_id in playlist_ids:
-            # Ищем трек в нашем списке по ID
             selected_track = next((track for track in all_tracks if int(track['id']) == int(track_id)), None)
             if selected_track:
-                # Добавляем в плейлист не просто ссылку, а объект с данными
                 playlist_tracks.append({
                     "title": selected_track.get('title'),
                     "artist": selected_track.get('artist'),
                     "musicUrl": selected_track.get('music_url')
                 })
-
+        
+        # Финальная проверка: если мы не смогли найти ни одного трека по ID от AI
         if not playlist_tracks:
-            return jsonify({"error": "AI не смог составить плейлист или выбрал несуществующие треки."}), 404
+            return jsonify({"error": "AI выбрал несуществующие треки."}), 404
 
-        # 4. ОТПРАВЛЯЕМ НА ФРОНТЕНД ОБЩУЮ ПОДВОДКУ И ВЕСЬ ПЛЕЙЛИСТ
         final_response = {
             "speechText": speech_text,
             "playlist": playlist_tracks 
