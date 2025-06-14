@@ -60,22 +60,23 @@ document.addEventListener('DOMContentLoaded', () => {
         spinner.style.display = isLoading ? 'block' : 'none';
     }
 
-    // --- Главная функция проигрывания (С ИСПРАВЛЕНИЕМ) ---
+    // --- Главная функция проигрывания (МОЗГ РАДИО) ---
     function playNextTrack() {
         let trackToPlay = null;
 
+        // ШАГ 1: ПРОВЕРЯЕМ, АКТИВЕН ЛИ РЕЖИМ AI И ЕСТЬ ЛИ В НЕМ ЕЩЕ ТРЕКИ
         if (isAiMode && currentTrackIndex < currentAiPlaylist.length) {
+            // Да, мы в режиме AI. Берем следующий трек из него.
             trackToPlay = currentAiPlaylist[currentTrackIndex];
             
-            // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ---
-            // Мы меняем текст ТОЛЬКО для второго и последующих треков.
-            // Для первого трека (index = 0) текст уже установлен (это подводка диджея).
+            // Показываем "Далее в эфире..." ТОЛЬКО для второго и последующих треков.
+            // Для первого трека (index=0) подводку уже показал диджей.
             if (currentTrackIndex > 0) {
-                speechTextElement.textContent = `Далее в эфире: ${trackToPlay.title}`;
+                speechTextElement.textContent = `Далее: ${trackToPlay.title}`;
             }
-
         } else {
-            isAiMode = false;
+            // ШАГ 2: РЕЖИМ AI ЗАКОНЧИЛСЯ ИЛИ НЕ НАЧИНАЛСЯ. ПЕРЕХОДИМ К СЛУЧАЙНОМУ РАДИО.
+            isAiMode = false; // Убеждаемся, что режим AI выключен.
             if (fullLibrary.length > 0) {
                 const randomIndex = Math.floor(Math.random() * fullLibrary.length);
                 trackToPlay = fullLibrary[randomIndex];
@@ -83,18 +84,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // ШАГ 3: ВОСПРОИЗВОДИМ ВЫБРАННЫЙ ТРЕК (ИЛИ СООБЩАЕМ ОБ ОШИБКЕ)
         if (trackToPlay) {
             trackInfoElement.textContent = `${trackToPlay.artist} - ${trackToPlay.title}`;
             nowPlayingContainer.style.display = 'block';
             audioPlayer.src = trackToPlay.musicUrl;
             audioPlayer.play();
         } else {
-            speechTextElement.textContent = "Музыка закончилась. Сделайте новый запрос.";
+            speechTextElement.textContent = "Музыка закончилась или библиотека пуста. Сделайте новый запрос.";
             nowPlayingContainer.style.display = 'none';
         }
     }
     
-    // --- Обработчик нажатия кнопки (УПРОЩЕННЫЙ И ИСПРАВЛЕННЫЙ) ---
+    // --- Обработчик нажатия кнопки (ЗАПУСКАЕТ РЕЖИМ AI) ---
     playButton.addEventListener('click', async () => {
         const userRequest = userRequestInput.value.trim();
         if (!userRequest) return;
@@ -102,37 +104,41 @@ document.addEventListener('DOMContentLoaded', () => {
         setButtonLoading(true);
         speechTextElement.textContent = "AI-диджей составляет плейлист...";
         nowPlayingContainer.style.display = 'none';
-        audioPlayer.pause(); // Останавливаем текущую музыку, если она играет
+        audioPlayer.pause(); 
 
         const data = await fetchAiPlaylist(userRequest);
         setButtonLoading(false);
 
         if (data.error) {
             speechTextElement.textContent = `Произошла ошибка: ${data.error}`;
+            isAiMode = false; // Сбрасываем режим AI в случае ошибки
             return;
         }
 
-        // 1. Показываем подводку диджея
+        // 1. Показываем подводку диджея, которую он прислал.
         speechTextElement.textContent = data.speechText || "К сожалению, не удалось найти подходящие треки.";
 
         if (data.playlist && data.playlist.length > 0) {
-            // 2. Готовим плейлист к проигрыванию
+            // 2. Успех! Готовимся к запуску AI-плейлиста.
             currentAiPlaylist = data.playlist;
             currentTrackIndex = 0;
-            isAiMode = true;
+            isAiMode = true; // Включаем режим AI
             
-            // 3. СРАЗУ запускаем первый трек. Наша новая логика в playNextTrack не сотрет подводку.
+            // 3. Запускаем первый трек. Дальше все пойдет по цепочке.
             playNextTrack();
         } else {
+            // AI ничего не нашел, остаемся в режиме случайного радио.
             isAiMode = false;
         }
     });
 
-    // --- Обработчик окончания трека ---
+    // --- Обработчик окончания трека (ПЕРЕКЛЮЧАТЕЛЬ) ---
     audioPlayer.addEventListener('ended', () => {
+        // Если мы были в режиме AI, увеличиваем счетчик, чтобы перейти к следующему треку.
         if (isAiMode) {
             currentTrackIndex++;
         }
+        // Просто вызываем "мозг" радио. Он сам решит, что делать дальше.
         playNextTrack();
     });
 
