@@ -6,11 +6,17 @@ import time
 
 app = Flask(__name__)
 
+# --- Создание временного файла для Google Cloud TTS из переменной окружения ---
+if os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"):
+    with open("google-credentials.json", "w") as f:
+        f.write(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google-credentials.json"
+
 # Настройка Gemini API
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 gemini_model = genai.GenerativeModel("gemini-pro")
 
-# Google Cloud TTS client (предполагается, что GOOGLE_APPLICATION_CREDENTIALS установлен)
+# Google Cloud TTS client
 tts_client = texttospeech.TextToSpeechClient()
 
 def generate_tts(text, filename):
