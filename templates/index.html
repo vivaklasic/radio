@@ -1,64 +1,53 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <title>Личное Радио</title>
-  <style>
-    body { font-family: sans-serif; text-align: center; padding: 2em; background: #f0f0f0; }
-    input, button { padding: 10px; font-size: 16px; margin: 10px; }
-    audio { margin-top: 20px; width: 300px; }
-  </style>
-</head>
-<body>
-  <h1>🎧 Твоё Персональное Радио</h1>
+<script>
+  let username = "";
 
-  <div id="startBlock">
-    <input type="text" id="username" placeholder="Как тебя зовут?" />
-    <button onclick="startRadio()">Запустить</button>
-  </div>
+  async function startRadio() {
+    username = document.getElementById("username").value || "Гость";
+    const res = await fetch("/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username })
+    });
+    const data = await res.json();
 
-  <div id="controlBlock" style="display:none">
-    <p id="voiceStatus">🔊 Подождите...</p>
-    <audio id="voicePlayer" controls autoplay></audio>
-
-    <br>
-    <input type="text" id="musicRequest" placeholder="Что хочешь послушать?" />
-    <button onclick="sendRequest()">Пожелание</button>
-
-    <p id="trackTitle"></p>
-    <audio id="musicPlayer" controls></audio>
-  </div>
-
-  <script>
-    let username = "";
-
-    async function startRadio() {
-      username = document.getElementById("username").value || "Гость";
-      const res = await fetch("/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username })
-      });
-      const data = await res.json();
-      document.getElementById("voicePlayer").src = data.voice;
-      document.getElementById("startBlock").style.display = "none";
-      document.getElementById("controlBlock").style.display = "block";
+    if (data.voice) {
+      // Если есть аудио, проигрываем
+      const vp = document.getElementById("voicePlayer");
+      vp.src = data.voice;
+      vp.style.display = "inline";
+      document.getElementById("voiceStatus").innerText = "🔊 Слушай...";
+    } else if (data.text) {
+      // Если нет озвучки, показываем текст
+      document.getElementById("voiceStatus").innerText = data.text;
+      // Скрываем аудио-плеер, чтобы не было пустого блока
+      document.getElementById("voicePlayer").style.display = "none";
     }
 
-    async function sendRequest() {
-      const input = document.getElementById("musicRequest").value;
-      document.getElementById("voiceStatus").innerText = "🔊 Думаю...";
-      const res = await fetch("/suggest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input })
-      });
-      const data = await res.json();
-      document.getElementById("voicePlayer").src = data.voice;
-      document.getElementById("musicPlayer").src = data.track;
-      document.getElementById("trackTitle").innerText = data.title;
+    document.getElementById("startBlock").style.display = "none";
+    document.getElementById("controlBlock").style.display = "block";
+  }
+
+  async function sendRequest() {
+    const input = document.getElementById("musicRequest").value;
+    document.getElementById("voiceStatus").innerText = "🔊 Думаю...";
+    const res = await fetch("/suggest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ input })
+    });
+    const data = await res.json();
+
+    if (data.voice) {
+      const vp = document.getElementById("voicePlayer");
+      vp.src = data.voice;
+      vp.style.display = "inline";
       document.getElementById("voiceStatus").innerText = "🎙️ Описание трека";
+    } else if (data.text) {
+      document.getElementById("voiceStatus").innerText = data.text;
+      document.getElementById("voicePlayer").style.display = "none";
     }
-  </script>
-</body>
-</html>
+
+    document.getElementById("musicPlayer").src = data.track;
+    document.getElementById("trackTitle").innerText = data.title;
+  }
+</script>
