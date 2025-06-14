@@ -90,6 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // --- Обработчик нажатия кнопки ---
+        // --- ИСПРАВЛЕННЫЙ Обработчик нажатия кнопки ---
     playButton.addEventListener('click', async () => {
         const userRequest = userRequestInput.value.trim();
         if (!userRequest) return;
@@ -103,14 +104,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (data.error) {
             speechTextElement.textContent = `Произошла ошибка: ${data.error}`;
-        } else if (data.playlist && data.playlist.length > 0) {
-            speechTextElement.textContent = data.speechText;
+            return; // Выходим из функции
+        }
+
+        // Показываем ответ диджея
+        speechTextElement.textContent = data.speechText || "К сожалению, не удалось найти подходящие треки.";
+
+        if (data.playlist && data.playlist.length > 0) {
+            // Если есть плейлист, обновляем его и готовимся к старту
             currentAiPlaylist = data.playlist;
             currentTrackIndex = 0;
             isAiMode = true;
-            playNextTrack();
+
+            // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: ЗАПУСКАЕМ МУЗЫКУ С ЗАДЕРЖКОЙ ---
+            // Даем пользователю 5 секунд, чтобы прочитать сообщение диджея.
+            // Вы можете изменить это значение (5000 миллисекунд).
+            setTimeout(() => {
+                playNextTrack();
+            }, 5000); 
+
         } else {
-            speechTextElement.textContent = data.speechText || "К сожалению, не удалось найти подходящие треки.";
+            // Если плейлист пуст, просто показываем сообщение и ничего не делаем
+            isAiMode = false;
         }
     });
 
