@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Gemini Radio</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="radio-container">
+        <header class="radio-header">
+            <h1>AI Gemini Radio</h1>
+            <p>Ваше персональное радио, управляемое настроением</p>
+        </header>
+
+        <main class="radio-controls">
+            <div class="input-group">
+                <label for="user-request">Что бы вы хотели послушать?</label>
+                <input type="text" id="user-request" placeholder="Например: что-нибудь для утренней пробежки">
+            </div>
+            <button id="play-button">
+                <span class="button-text">Подобрать трек</span>
+                <div class="spinner" id="spinner" style="display: none;"></div>
+            </button>
+        </main>
+
+        <footer class="radio-player">
+            <div id="status-display" class="status-display">
+                <p id="speech-text">Здесь будет анонс от AI-диджея...</p>
+            </div>
+            <div id="now-playing" class="now-playing" style="display: none;">
+                <span id="track-info">Артист - Название трека</span>
+            </div>
+            <audio id="audio-player" controls></audio>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
