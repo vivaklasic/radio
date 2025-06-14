@@ -1,74 +1,114 @@
-from flask import Flask, render_template, request, jsonify
-import google.generativeai as genai
-# from google.cloud import texttospeech  # Закомментировали пока TTS
 import os
-import time
+import random
+import gspread
+import google.generativeai as genai
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+from dotenv import load_dotenv
 
+load_dotenv() # Загружаем переменные окружения из файла .env
+
+# --- НАСТРОЙКА ---
+
+# Настройка Flask
 app = Flask(__name__)
+CORS(app) # Разрешаем кросс-доменные запросы (чтобы ваш сайт мог обращаться к серверу)
 
-# --- Создание временного файла для Google Cloud TTS из переменной окружения ---
-# if os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"):
-#     with open("google-credentials.json", "w") as f:
-#         f.write(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))
-#     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google-credentials.json"
+# Настройка доступа к Google Sheets
+try:
+    gc = gspread.service_account(filename='credentials.json') # Укажите путь к вашему JSON-ключу
+    sh = gc.open_by_key('YOUR_GOOGLE_SHEET_KEY') # Вставьте сюда ключ вашей таблицы из URL
+    tracks_worksheet = sh.worksheet('tracks') # Укажите имя листа
+    print("Успешное подключение к Google Sheets.")
+except Exception as e:
+    print(f"Ошибка подключения к Google Sheets: {e}")
+    tracks_worksheet = None
 
 # Настройка Gemini API
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-gemini_model = genai.GenerativeModel("gemini-pro")
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-pro')
+    print("Успешная настройка Gemini API.")
+else:
+    print("API ключ для Gemini не найден в .env файле.")
+    model = None
 
-# Google Cloud TTS client
-# tts_client = texttospeech.TextToSpeechClient()
+# --- ЛОГИКА ---
 
-def generate_tts(text, filename):
-    # Закомментировали, чтобы не использовать TTS
-    # synthesis_input = texttospeech.SynthesisInput(text=text)
-    # voice = texttospeech.VoiceSelectionParams(
-    #     language_code="ru-RU",
-    #     name="ru-RU-Wavenet-C"
-    # )
-    # audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+def get_all_tracks():
+    """Получает все треки из Google Таблицы."""
+    if not tracks_worksheet:
+        return []
+    records = tracks_worksheet.get_all_records() # Получаем данные как список словарей
+    return records
 
-    # response = tts_client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
-    # path = os.path.join("static", "voices", filename)
-    # with open(path, "wb") as out:
-    #     out.write(response.audio_content)
-    # return f"/static/voices/{filename}"
-    return None  # Возвращаем None, чтобы знать, что озвучки нет
+def format_tracks_for_ai(tracks):
+    """Форматирует список треков в текстовое описание для Gemini."""
+    description = ""
+    for track in tracks:
+        description += f"ID: {track['id']}, Title: {track['title']}, Artist: {track['artist']}, Mood: {track['mood']}\n"
+    return description
 
-@app.route("/")
-def index():
-    return render_template("index.html")
+# --- API ЭНДПОИНТ ---
 
-@app.route("/start", methods=["POST"])
-def start_radio():
-    username = request.json.get("username", "Гость")
-    greeting = f"Привет, {username}! Что ты хочешь послушать? Можешь написать или подожди немного — я сам что-нибудь включу."
-    # tts_path = generate_tts(greeting, f"greeting_{int(time.time())}.mp3")
-    # Вместо озвучки — просто возвращаем None
-    tts_path = None
-    return jsonify({"voice": tts_path, "text": greeting})
+@app.route('/get-radio-play', methods=['POST'])
+def get_radio_play():
+    if not model or not tracks_worksheet:
+        return jsonify({"error": "Сервер не настроен"}), 500
 
-@app.route("/suggest", methods=["POST"])
-def suggest():
-    user_input = request.json.get("input")
+    # Получаем запрос от пользователя из тела POST-запроса
+    user_request = request.json.get('request', 'удиви меня')
+    user_name = request.json.get('userName', 'слушатель')
 
-    if not user_input:
-        topic = "что-нибудь спокойное и приятное"
-    else:
-        topic = user_input
+    # 1. Получаем треки и форматируем их для AI
+    all_tracks = get_all_tracks()
+    if not all_tracks:
+        return jsonify({"error": "Не удалось загрузить треки из базы"}), 500
+        
+    library_description = format_tracks_for_ai(all_tracks)
 
-    prompt = f"Предложи трек по запросу: '{topic}'. Ответь в формате: Название — Исполнитель."
-    response = gemini_model.generate_content(prompt)
-    song = response.text.strip().split("\n")[0]
+    # 2. Создаем промпт для Gemini
+    prompt = f"""
+        Ты AI-диджей. Твоя задача - подобрать один трек из библиотеки для слушателя и написать короткую подводку.
+        Запрос от слушателя по имени {user_name}: "{user_request}"
 
-    voice_intro = f"Вот что я нашёл: {song}. Надеюсь, тебе понравится!"
-    # tts_path = generate_tts(voice_intro, f"song_{int(time.time())}.mp3")
-    tts_path = None  # Пока без озвучки
+        Музыкальная библиотека:
+        {library_description}
 
-    # Пока просто один трек — заглушка
-    music_path = "/static/music/sample.mp3"
+        Ответь в формате JSON, и только JSON.
+        Структура: {{ "trackId": ID_трека_из_библиотеки, "speechText": "Текст твоей подводки" }}
+    """
 
-    return jsonify({"voice": tts_path, "text": voice_intro, "track": music_path, "title": song})
+    try:
+        # 3. Отправляем запрос в Gemini
+        response = model.generate_content(prompt)
+        # Очищаем ответ от возможных лишних символов
+        clean_response = response.text.replace('```json', '').replace('```', '').strip()
+        ai_data = json.loads(clean_response)
+        
+        selected_track_id = int(ai_data['trackId'])
+        speech_text = ai_data['speechText']
 
-if __name__ == "__main__":
-    app.run(debug=True)
+        # 4. Находим выбранный трек в нашем списке
+        selected_track = next((track for track in all_tracks if track['id'] == selected_track_id), None)
+
+        if not selected_track:
+            return jsonify({"error": "AI выбрал несуществующий трек"}), 404
+
+        # 5. Собираем финальный ответ для фронтенда
+        final_response = {
+            "speechText": speech_text, # Здесь просто текст, не аудио
+            "musicUrl": selected_track['music_url'],
+            "title": selected_track['title'],
+            "artist": selected_track['artist']
+        }
+        
+        return jsonify(final_response)
+
+    except Exception as e:
+        print(f"Произошла ошибка: {e}")
+        return jsonify({"error": "Внутренняя ошибка сервера при обработке запроса"}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5001)
