@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Личное Радио</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 2em; background: #f0f0f0; }
+    input, button { padding: 10px; font-size: 16px; margin: 10px; }
+    audio { margin-top: 20px; width: 300px; }
+  </style>
+</head>
+<body>
+  <h1>🎧 Твоё Персональное Радио</h1>
+
+  <div id="startBlock">
+    <input type="text" id="username" placeholder="Как тебя зовут?" />
+    <button onclick="startRadio()">Запустить</button>
+  </div>
+
+  <div id="controlBlock" style="display:none">
+    <p id="voiceStatus">🔊 Подождите...</p>
+    <audio id="voicePlayer" controls autoplay></audio>
+
+    <br>
+    <input type="text" id="musicRequest" placeholder="Что хочешь послушать?" />
+    <button onclick="sendRequest()">Пожелание</button>
+
+    <p id="trackTitle"></p>
+    <audio id="musicPlayer" controls></audio>
+  </div>
+
+  <script>
+    let username = "";
+
+    async function startRadio() {
+      username = document.getElementById("username").value || "Гость";
+      const res = await fetch("/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username })
+      });
+      const data = await res.json();
+      document.getElementById("voicePlayer").src = data.voice;
+      document.getElementById("startBlock").style.display = "none";
+      document.getElementById("controlBlock").style.display = "block";
+    }
+
+    async function sendRequest() {
+      const input = document.getElementById("musicRequest").value;
+      document.getElementById("voiceStatus").innerText = "🔊 Думаю...";
+      const res = await fetch("/suggest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input })
+      });
+      const data = await res.json();
+      document.getElementById("voicePlayer").src = data.voice;
+      document.getElementById("musicPlayer").src = data.track;
+      document.getElementById("trackTitle").innerText = data.title;
+      document.getElementById("voiceStatus").innerText = "🎙️ Описание трека";
+    }
+  </script>
+</body>
+</html>
