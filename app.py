@@ -12,7 +12,6 @@ app = Flask(__name__)
 CORS(app)
 
 # --- Настройка (без изменений) ---
-# ... (весь ваш блок настройки остается без изменений) ...
 tracks_worksheet = None
 model = None
 
@@ -42,11 +41,15 @@ else:
     model = None
 
 # --- Логика (без изменений) ---
-# ... (функции get_all_tracks и format_tracks_for_ai остаются без изменений) ...
 def get_all_tracks():
-    if not tracks_worksheet: return []
-    try: return tracks_worksheet.get_all_records()
-    except Exception as e: return []
+    if not tracks_worksheet:
+        print("Ошибка: объект tracks_worksheet не инициализирован.")
+        return []
+    try:
+        return tracks_worksheet.get_all_records()
+    except Exception as e:
+        print(f"Ошибка при получении записей из Google Sheets: {e}")
+        return []
 
 def format_tracks_for_ai(tracks):
     library_text = ""
@@ -57,11 +60,31 @@ def format_tracks_for_ai(tracks):
         library_text += track_info
     return library_text
 
-# --- API Эндпоинт (с новыми проверками) ---
+# --- API ЭНДПОИНТЫ ---
+
 @app.route('/')
 def index():
     return "Flask-сервер для AI Радио работает!"
 
+# --- НОВЫЙ ЭНДПОИНТ ДЛЯ ПОЛУЧЕНИЯ ВСЕХ ТРЕКОВ ---
+@app.route('/get-full-playlist', methods=['GET'])
+def get_full_playlist_route():
+    print("Запрос на /get-full-playlist получен.")
+    all_tracks = get_all_tracks()
+    if not all_tracks:
+        return jsonify({"error": "Библиотека музыки пуста"}), 404
+    
+    playlist = []
+    for track in all_tracks:
+        playlist.append({
+            "title": track.get('title'),
+            "artist": track.get('artist'),
+            "musicUrl": track.get('music_url')
+        })
+    return jsonify({"playlist": playlist})
+
+
+# --- СТАРЫЙ ЭНДПОИНТ ДЛЯ GEMINI (без изменений) ---
 @app.route('/get-radio-play', methods=['POST'])
 def get_radio_play():
     if not model or not tracks_worksheet:
@@ -78,7 +101,7 @@ def get_radio_play():
         return jsonify({"error": "Библиотека музыки пуста."}), 500
         
     library_description = format_tracks_for_ai(all_tracks)
-
+    
     prompt = f"""
         Ты AI-диджей. Твоя задача - составить плейлист из подходящих песен, который соответствует запросу слушателя.
         Подбери столько треков, сколько сможешь найти подходящих, но не более 5. 
@@ -86,10 +109,8 @@ def get_radio_play():
         После этого напиши одну общую, короткую и дружелюбную подводку для всего этого музыкального блока. Если плейлист пуст, твоя подводка должна говорить, что ты ничего не нашел.
 
         Запрос от слушателя по имени {user_name}: "{user_request}"
-
         Музыкальная библиотека:
         {library_description}
-
         Ответь в формате JSON, и только JSON.
         Структура: {{ "playlist": [ID_трека_1, ID_трека_2, ...], "speechText": "Текст твоей подводки" }}
     """
@@ -98,14 +119,10 @@ def get_radio_play():
         response = model.generate_content(prompt)
         ai_data = json.loads(response.text)
         
-        # Улучшенная проверка ответа от AI
         playlist_ids = ai_data.get('playlist', [])
         speech_text = ai_data.get('speechText', "Что-то пошло не так...")
         
-        # Проверяем, что плейлист - это список, и он не пустой
         if not isinstance(playlist_ids, list) or not playlist_ids:
-            print("AI вернул пустой или некорректный плейлист.")
-            # Отправляем на фронт текст от AI, но с пустым плейлистом
             return jsonify({"speechText": speech_text, "playlist": []})
 
         playlist_tracks = []
@@ -118,8 +135,8 @@ def get_radio_play():
                     "musicUrl": selected_track.get('music_url')
                 })
         
-        # Финальная проверка: если мы не смогли найти ни одного трека по ID от AI
-        if not playlist_tracks:
+        if not playlist_tracks and playlist_ids:
+            # Эта ветка на случай, если AI вернул ID, которых нет в таблице
             return jsonify({"error": "AI выбрал несуществующие треки."}), 404
 
         final_response = {
