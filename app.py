@@ -1,37 +1,39 @@
 from flask import Flask, render_template, request, jsonify
 import google.generativeai as genai
-from google.cloud import texttospeech
+# from google.cloud import texttospeech  # Закомментировали пока TTS
 import os
 import time
 
 app = Flask(__name__)
 
 # --- Создание временного файла для Google Cloud TTS из переменной окружения ---
-if os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"):
-    with open("google-credentials.json", "w") as f:
-        f.write(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google-credentials.json"
+# if os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"):
+#     with open("google-credentials.json", "w") as f:
+#         f.write(os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"))
+#     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google-credentials.json"
 
 # Настройка Gemini API
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 gemini_model = genai.GenerativeModel("gemini-pro")
 
 # Google Cloud TTS client
-tts_client = texttospeech.TextToSpeechClient()
+# tts_client = texttospeech.TextToSpeechClient()
 
 def generate_tts(text, filename):
-    synthesis_input = texttospeech.SynthesisInput(text=text)
-    voice = texttospeech.VoiceSelectionParams(
-        language_code="ru-RU",
-        name="ru-RU-Wavenet-C"
-    )
-    audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+    # Закомментировали, чтобы не использовать TTS
+    # synthesis_input = texttospeech.SynthesisInput(text=text)
+    # voice = texttospeech.VoiceSelectionParams(
+    #     language_code="ru-RU",
+    #     name="ru-RU-Wavenet-C"
+    # )
+    # audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
 
-    response = tts_client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
-    path = os.path.join("static", "voices", filename)
-    with open(path, "wb") as out:
-        out.write(response.audio_content)
-    return f"/static/voices/{filename}"
+    # response = tts_client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
+    # path = os.path.join("static", "voices", filename)
+    # with open(path, "wb") as out:
+    #     out.write(response.audio_content)
+    # return f"/static/voices/{filename}"
+    return None  # Возвращаем None, чтобы знать, что озвучки нет
 
 @app.route("/")
 def index():
@@ -41,8 +43,10 @@ def index():
 def start_radio():
     username = request.json.get("username", "Гость")
     greeting = f"Привет, {username}! Что ты хочешь послушать? Можешь написать или подожди немного — я сам что-нибудь включу."
-    tts_path = generate_tts(greeting, f"greeting_{int(time.time())}.mp3")
-    return jsonify({"voice": tts_path})
+    # tts_path = generate_tts(greeting, f"greeting_{int(time.time())}.mp3")
+    # Вместо озвучки — просто возвращаем None
+    tts_path = None
+    return jsonify({"voice": tts_path, "text": greeting})
 
 @app.route("/suggest", methods=["POST"])
 def suggest():
@@ -58,12 +62,13 @@ def suggest():
     song = response.text.strip().split("\n")[0]
 
     voice_intro = f"Вот что я нашёл: {song}. Надеюсь, тебе понравится!"
-    tts_path = generate_tts(voice_intro, f"song_{int(time.time())}.mp3")
+    # tts_path = generate_tts(voice_intro, f"song_{int(time.time())}.mp3")
+    tts_path = None  # Пока без озвучки
 
     # Пока просто один трек — заглушка
     music_path = "/static/music/sample.mp3"
 
-    return jsonify({"voice": tts_path, "track": music_path, "title": song})
+    return jsonify({"voice": tts_path, "text": voice_intro, "track": music_path, "title": song})
 
 if __name__ == "__main__":
     app.run(debug=True)
