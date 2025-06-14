@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- URL вашего бэкенда на Render ---
     // !!! ЗАМЕНИТЕ НА ВАШ РЕАЛЬНЫЙ URL ПОСЛЕ ДЕПЛОЯ !!!
-    const backendUrl = 'https://your-flask-app-name.onrender.com/get-radio-play';
+    const backendUrl = 'https://radio-2gyc.onrender.com';
     // Для локальных тестов:
     // const backendUrl = 'http://127.0.0.1:5001/get-radio-play';
 
