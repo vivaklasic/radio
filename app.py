@@ -65,16 +65,20 @@ def get_all_tracks():
 
 
 def format_tracks_for_ai(tracks):
-    """Форматирует список треков в текстовое описание для Gemini."""
-    description = ""
+    """Форматирует список треков в подробное текстовое описание для Gemini."""
+    library_text = ""
     for track in tracks:
-        # Добавим проверку на наличие ключей, чтобы избежать ошибок
-        track_id = track.get('id', 'N/A')
-        title = track.get('title', 'N/A')
-        artist = track.get('artist', 'N/A')
-        mood = track.get('mood', 'N/A')
-        description += f"ID: {track_id}, Title: {title}, Artist: {artist}, Mood: {mood}\n"
-    return description
+        # Собираем всю информацию о треке в одну строку
+        track_info = (
+            f"ID: {track.get('id', 'N/A')}, "
+            f"Title: {track.get('title', 'N/A')}, "
+            f"Artist: {track.get('artist', 'N/A')}, "
+            f"Genre: {track.get('genre', 'N/A')}, "
+            f"Mood: {track.get('mood', 'N/A')}, "
+            f"Description: {track.get('description', 'N/A')}\n"
+        )
+        library_text += track_info
+    return library_text
 
 # --- API ЭНДПОИНТ ---
 
