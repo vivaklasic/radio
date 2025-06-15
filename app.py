@@ -10,8 +10,20 @@ from dotenv import load_dotenv
 # --- Инициализация и настройка ---
 load_dotenv()
 app = Flask(__name__)
-# Разрешаем CORS-запросы со всех доменов для разработки
-CORS(app) 
+
+origins = [
+    "https://stop-neurodeception.web.app",      # Ваш основной сайт на Firebase
+    "https://stop-neurodeception.firebaseapp.com", # Дополнительный домен Firebase (лучше добавить оба)
+    # Если вы разрабатываете локально, раскомментируйте следующие строки,
+    # указав порт, который использует ваш локальный сервер (например, 5500 для Live Server в VS Code).
+    # "http://localhost:5500",
+    # "http://127.0.0.1:5500"
+]
+
+# Применяем политику: разрешаем доступ к любым ресурсам (/*)
+# только сайтам из списка 'origins'.
+CORS(app, resources={r"/*": {"origins": origins}})
+# --- КОНЕЦ НАСТРОЙКИ CORS ---
 
 # Глобальные переменные для хранения подключений
 tracks_worksheet = None
