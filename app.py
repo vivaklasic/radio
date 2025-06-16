@@ -107,43 +107,36 @@ def get_full_playlist_route():
     return jsonify({"playlist": playlist})
 
 
+# --- Вставьте этот код вместо вашей текущей функции get_radio_play ---
 @app.route('/get-radio-play', methods=['POST'])
 def get_radio_play():
     """Основной эндпоинт, который обращается к AI в два этапа для генерации плейлиста."""
-    # Проверяем, что все глобальные объекты на месте
     if not model or not sh:
         return jsonify({"error": "Сервер не настроен должным образом (проблема с Google Sheets или Gemini API)."}), 500
     
-    # Получаем данные от пользователя
     try:
         data = request.get_json(force=True)
         user_request = data.get('request', 'удиви меня')
         user_name = data.get('userName', 'слушатель')
-        # Получаем язык (пока не используем в format_tracks_for_ai, но уже готово)
         lang = data.get('language', 'ru') 
     except Exception as e:
         print(f"Ошибка получения JSON из запроса: {e}")
         return jsonify({"error": "Неверный формат запроса. Ожидается JSON."}), 400
 
-    # ===================================================================
-    # ЭТАП 1: AI ВЫБИРАЕТ НУЖНЫЙ ЛИСТ (ПЛЕЙЛИСТ)
-    # ===================================================================
+    # --- ЭТАП 1: AI ВЫБИРАЕТ ЛИСТ ---
     try:
         all_worksheets = sh.worksheets()
         worksheet_names = [ws.title for ws in all_worksheets]
         print(f"Доступные плейлисты (листы): {worksheet_names}")
     except Exception as e:
-        print(f"Критическая ошибка: не удалось получить список листов из таблицы. Ошибка: {e}")
+        print(f"Критическая ошибка: не удалось получить список листов. Ошибка: {e}")
         return jsonify({"error": "Не удалось загрузить список плейлистов."}), 500
 
     prompt_stage1 = f"""
         Ты — музыкальный менеджер. Проанализируй запрос слушателя и выбери ОДИН, самый подходящий плейлист из списка.
-        В ответе укажи ТОЛЬКО ТОЧНОЕ НАЗВАНИЕ листа, без лишних слов и знаков препинания.
-
+        В ответе укажи ТОЛЬКО ТОЧНОЕ НАЗВАНИЕ листа, без лишних слов.
         Запрос слушателя: "{user_request}"
-        
-        Список доступных плейлистов:
-        {', '.join(worksheet_names)}
+        Список доступных плейлистов: {', '.join(worksheet_names)}
     """
     
     selected_sheet_name = ""
@@ -151,18 +144,14 @@ def get_radio_play():
         response_stage1 = model.generate_content(prompt_stage1)
         selected_sheet_name = response_stage1.text.strip()
         print(f"AI выбрал плейлист: '{selected_sheet_name}'")
-
         if selected_sheet_name not in worksheet_names:
-            print(f"Предупреждение: AI вернул несуществующее имя листа '{selected_sheet_name}'. Выбираю случайный.")
+            print(f"Предупреждение: AI вернул несуществующее имя листа. Выбираю случайный.")
             selected_sheet_name = random.choice(worksheet_names)
-            
     except Exception as e:
         print(f"Ошибка на 1-м этапе вызова AI: {e}. Выбираю случайный плейлист.")
         selected_sheet_name = random.choice(worksheet_names)
 
-    # ===================================================================
-    # ЭТАП 2: AI ВЫБИРАЕТ ТРЕКИ ИЗ ВЫБРАННОГО ЛИСТА
-    # ===================================================================
+    # --- ЭТАП 2: AI ВЫБИРАЕТ ТРЕКИ ИЗ ЛИСТА ---
     try:
         selected_worksheet = sh.worksheet(selected_sheet_name)
         all_tracks = selected_worksheet.get_all_records()
@@ -171,61 +160,39 @@ def get_radio_play():
     except gspread.exceptions.WorksheetNotFound:
          return jsonify({"error": f"Плейлист с названием '{selected_sheet_name}' не найден."}), 404
     except Exception as e:
-        print(f"Ошибка при получении данных с листа '{selected_sheet_name}': {e}")
         return jsonify({"error": f"Не удалось загрузить плейлист '{selected_sheet_name}'."}), 500
         
-    library_description = format_tracks_for_ai(all_tracks) # Используем вашу функцию
+    library_description = format_tracks_for_ai(all_tracks)
     
     prompt_stage2 = f"""
-        Ты — AI-диджей по имени Джем. Твоя личность: дружелюбная, немного остроумная и увлеченная музыкой.
-        Твоя задача — проанализировать запрос слушателя и подобрать для него плейлист из примерно 10 треков из предоставленной музыкальной библиотеки (это плейлист '{selected_sheet_name}').
-        
-        После подбора треков, ты должен написать "подводку" (speechText) к этому музыкальному блоку.
-        В своей подводке ты должен:
-        1. Обратиться к слушателю по имени ({user_name}).
-        2. Упомянуть, что ты понял его запрос ("{user_request}").
-        3. Рассказать, сколько треков ты подобрал и почему они ему понравятся. МОЖЕШЬ УПОМЯНУТЬ НАЗВАНИЕ ПЛЕЙЛИСТА '{selected_sheet_name}', из которого ты их взял.
-        4. Завершить подводку позитивной и энергичной фразой.
-        
-        ВАЖНО:
-        - Если подходящих треков нет, верни в поле "playlist" пустой массив [].
-        - Твой ответ ДОЛЖЕН БЫТЬ ТОЛЬКО в формате JSON.
-
+        Ты — AI-диджей по имени Джем. Твоя задача — подобрать плейлист из примерно 10 треков из предоставленной музыкальной библиотеки (это плейлист '{selected_sheet_name}').
+        После подбора треков, напиши "подводку" (speechText) к этому музыкальному блоку.
+        В подводке обратись к слушателю ({user_name}), упомяни его запрос ("{user_request}") и можешь упомянуть название плейлиста '{selected_sheet_name}'.
+        Твой ответ ДОЛЖЕН БЫТЬ ТОЛЬКО в формате JSON.
         ЗАПРОС ОТ СЛУШАТЕЛЯ:
         - Имя: {user_name}
         - Пожелание: "{user_request}"
-
         МУЗЫКАЛЬНАЯ БИБЛИОТЕКА (плейлист '{selected_sheet_name}'):
         {library_description}
-
         СТРУКТУРА ОТВЕТА (только JSON):
         {{
           "playlist": [ID_трека_1, ID_трека_2, ...],
           "speechText": "Текст твоей живой и интересной подводки здесь."
         }}
     """
-
-    # Этот блок try-except остается почти без изменений, он обрабатывает второй вызов AI
+    
     raw_text = ""
     try:
         response_stage2 = model.generate_content(prompt_stage2)
-
-        # ... (здесь весь ваш существующий код для обработки ответа: проверка на block, парсинг json, и т.д.) ...
-        if not response_stage2.parts:
-            # ...
-            return jsonify({ "speechText": "...", "playlist": [] }), 400
-
         raw_text = response_stage2.text
         json_text = raw_text.strip().replace('```json', '').replace('```', '').strip()
-
         ai_data = json.loads(json_text)
+        
         playlist_ids = ai_data.get('playlist', [])
         speech_text = ai_data.get('speechText', "Что-то пошло не так...")
         
-        # ... (и далее весь ваш код для формирования final_response и его возврата) ...
         playlist_tracks = []
         for track_id in playlist_ids:
-            # ВАЖНО: ищем треки в all_tracks, который мы загрузили из нужного листа
             selected_track = next((track for track in all_tracks if str(track.get('id')) == str(track_id)), None)
             if selected_track:
                 playlist_tracks.append({
@@ -234,17 +201,26 @@ def get_radio_play():
                     "musicUrl": selected_track.get('music_url')
                 })
         
+        # --- НОВОЕ ИЗМЕНЕНИЕ: ГОТОВИМ ПОЛНЫЙ ПЛЕЙЛИСТ С ЛИСТА ---
+        full_playlist_from_sheet = []
+        for track in all_tracks:
+            full_playlist_from_sheet.append({
+                "title": track.get('title'),
+                "artist": track.get('artist'),
+                "musicUrl": track.get('music_url')
+            })
+
+        # --- НОВОЕ ИЗМЕНЕНИЕ: ДОБАВЛЯЕМ ПОЛНЫЙ ПЛЕЙЛИСТ В ОТВЕТ ---
         final_response = {
             "speechText": speech_text,
-            "playlist": playlist_tracks 
+            "playlist": playlist_tracks,
+            "full_playlist_from_sheet": full_playlist_from_sheet
         }
+        
         return jsonify(final_response)
 
-    except json.JSONDecodeError as e:
-        print(f"ОШИБКА ДЕКОДИРОВАНИЯ JSON. Ответ от Gemini был: '{raw_text}'. Ошибка: {e}")
-        return jsonify({"error": "AI вернул некорректный формат данных. Попробуйте еще раз."}), 500
     except Exception as e:
-        print(f"ПРОИЗОШЛА НЕПРЕДВИДЕННАЯ ОШИБКА НА ЭТАПЕ 2: {e}")
+        print(f"ПРОИЗОШЛА НЕПРЕДВИДЕННАЯ ОШИБКА НА ЭТАПЕ 2: {e}\nОтвет от Gemini был: '{raw_text}'")
         return jsonify({"error": "Внутренняя ошибка сервера при обработке запроса."}), 500
 
 # --- Запуск сервера ---
