@@ -6,6 +6,7 @@ import google.generativeai as genai
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
+import re
 
 # --- Инициализация и настройка ---
 load_dotenv()
