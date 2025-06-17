@@ -4,4 +4,3 @@ gunicorn
 gspread
 google-generativeai
 python-dotenv
-re
