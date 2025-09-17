@@ -13,8 +13,8 @@ load_dotenv()
 app = Flask(__name__)
 
 origins = [
-    "https://stop-neurodeception.web.app",
-    "https://stop-neurodeception.firebaseapp.com",
+    "https://aifake.pro",
+    "https://aifake-pro.firebaseapp.com",
     # "http://localhost:5500",
     # "http://127.0.0.1:5500"
 ]
