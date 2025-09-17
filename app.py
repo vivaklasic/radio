@@ -13,10 +13,9 @@ load_dotenv()
 app = Flask(__name__)
 
 origins = [
-    "https://aifake.pro",
-    "https://aifake-pro.firebaseapp.com",
-    # "http://localhost:5500",
-    # "http://127.0.0.1:5500"
+    "https://aifake.pro",           
+    "https://aiforma.web.app",      
+    "https://aiforma.firebaseapp.com",
 ]
 
 CORS(app, resources={r"/*": {"origins": origins}})
