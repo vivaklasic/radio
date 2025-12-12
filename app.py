@@ -72,7 +72,7 @@ except Exception as e:
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    model = genai.GenerativeModel('gemini-2.5-pro')
     print("Успешная настройка Gemini API с моделью gemini-1.5-flash-latest.")
 else:
     print("КРИТИЧЕСКАЯ ОШИБКА: API ключ для Gemini не найден.")
