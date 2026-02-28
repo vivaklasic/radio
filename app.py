@@ -2,7 +2,7 @@ import os
 import random
 import json
 import gspread
-import google.generativeai as genai
+from google import genai
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -21,7 +21,7 @@ origins = [
 CORS(app, resources={r"/*": {"origins": origins}})
 
 # Глобальные переменные
-model = None
+client = None  # <-- ИСПРАВЛЕНО: было model
 sh = None
 PLAYLIST_METADATA_SHEET_NAME = "_PlaylistMetadata" # Название мета-листа
 PLAYLIST_METADATA = {} # Словарь для хранения метаданных плейлистов
@@ -71,12 +71,11 @@ except Exception as e:
 # --- Настройка Gemini API ---
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-2.5-flash')
-    print("Успешная настройка Gemini API с моделью gemini-1.5-flash")
+    client = genai.Client(api_key=GEMINI_API_KEY)  # <-- ИСПРАВЛЕНО
+    print("Успешная настройка Gemini API с моделью gemini-2.5-flash")
 else:
     print("КРИТИЧЕСКАЯ ОШИБКА: API ключ для Gemini не найден.")
-    model = None
+    client = None  # <-- ИСПРАВЛЕНО: было model
 
 # --- NEW: Обновленные промпты ---
 PROMPT_TEMPLATES = {
@@ -267,7 +266,7 @@ def get_full_playlist_route():
 
 @app.route('/get-radio-play', methods=['POST'])
 def get_radio_play():
-    if not model or not sh:
+    if not client or not sh:  # <-- ИСПРАВЛЕНО: было model
         return jsonify({"error": "Сервер не настроен должным образом (проблема с Google Sheets или Gemini API)."}), 500
     if not PLAYLIST_METADATA:
         return jsonify({"error": f"Метаданные плейлистов не загружены. Проверьте лист '{PLAYLIST_METADATA_SHEET_NAME}'."}), 500
@@ -322,8 +321,8 @@ def get_radio_play():
     selected_sheet_name = ""
     try:
         print(f"\n--- Промпт для Этапа 1 (язык: {lang_code}) ---\n{prompt_stage1}\n----------------------------")
-        response_stage1 = model.generate_content(prompt_stage1)
-        selected_sheet_name = response_stage1.text.strip()
+        response_stage1 = client.models.generate_content(model="gemini-2.5-flash", contents=prompt_stage1)  # <-- ИСПРАВЛЕНО
+        selected_sheet_name = response_stage1.text.strip()  # <-- ИСПРАВЛЕНО: было raw_text = ..., selected_sheet_name не присваивался
         # Иногда AI может добавить кавычки, убираем их
         selected_sheet_name = selected_sheet_name.strip("'\"")
         print(f"AI выбрал плейлист: '{selected_sheet_name}' (Запрос на языке: {lang_code})")
@@ -359,7 +358,7 @@ def get_radio_play():
     raw_text = ""
     try:
         print(f"\n--- Промпт для Этапа 2 (плейлист: {selected_sheet_name}, язык: {lang_code}) ---\n{prompt_stage2}\n----------------------------")
-        response_stage2 = model.generate_content(prompt_stage2)
+        response_stage2 = client.models.generate_content(model="gemini-2.5-flash", contents=prompt_stage2)  # <-- ИСПРАВЛЕНО
         raw_text = response_stage2.text
 
         json_text_match = re.search(r"```json\s*([\s\S]*?)\s*```|({[\s\S]*})", raw_text)
