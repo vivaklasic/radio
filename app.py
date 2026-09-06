@@ -13,7 +13,7 @@ load_dotenv()
 app = Flask(__name__)
 
 origins = [
-    "https://aifake.pro",           
+    "https://aistopfake.com",           
     "https://aiforma.web.app",      
     "https://aiforma.firebaseapp.com",
 ]
